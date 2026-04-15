@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI × Design Mindset — Yijun · MIT AI Product Program</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* ───────────────────────── TOKENS ───────────────────────── */
+:root {
+  --bg:       #0A1022;
+  --surf:     linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.03));
+  --surf-s:   #0D1735;
+  --surf2:    rgba(255,255,255,0.05);
+  --surf3:    rgba(255,255,255,0.09);
+  --ink:      #E8EFFF;
+  --ink2:     #C9D7FF;
+  --muted:    #8899CC;
+  --muted2:   rgba(255,255,255,0.07);
+  --border:   rgba(255,255,255,0.10);
+  --border2:  rgba(255,255,255,0.06);
+
+  --c-core:   #FFD57A;
+  --c-prin:   #AB8DFF;
+  --c-tech:   #7EE0B7;
+  --c-app:    #85A9FF;
+  --c-hum:    #6EC4E8;
+  --c-eth:    #FF8DAB;
+  --c-sel:    #E8E4FC;
+
+  --r:8px; --r-lg:14px; --r-xl:20px;
+  --t:0.20s ease;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;
+  background:linear-gradient(180deg,#0A1022 0%,#0D1735 50%,#101D43 100%);
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;color:var(--ink);font-size:14px;line-height:1.6}
+
+/* ───────────────────────── SHARED NAV ───────────────────────── */
+#top-nav {
+  position:fixed;top:0;left:0;right:0;height:52px;z-index:200;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;
+  background:rgba(10,16,34,0.88);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);
+}
+.nav-brand{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.04em;display:flex;align-items:center;gap:8px}
+.nav-brand span{color:var(--ink2);font-weight:500}
+.nav-brand .dot{width:4px;height:4px;border-radius:50%;background:var(--c-core);flex-shrink:0}
+
+.view-switch{display:flex;background:var(--surf2);border:1px solid var(--border);border-radius:100px;padding:3px;gap:2px}
+.vsw-btn{
+  padding:5px 16px;border-radius:100px;border:none;cursor:pointer;
+  font-size:12px;font-weight:600;letter-spacing:0.02em;
+  background:transparent;color:var(--muted);transition:all var(--t);
+  display:flex;align-items:center;gap:6px;
+}
+.vsw-btn svg{flex-shrink:0;opacity:0.6;transition:opacity var(--t)}
+.vsw-btn.active{background:var(--surf3);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,0.4)}
+.vsw-btn.active svg{opacity:1}
+.vsw-btn:not(.active):hover{color:var(--ink2)}
+
+/* ───────────────────────── VIEWS ───────────────────────── */
+.view{position:fixed;inset:0;padding-top:52px;transition:opacity .25s ease,visibility .25s}
+.view.hidden{opacity:0;visibility:hidden;pointer-events:none}
+
+/* ───────────────────────── MINDMAP VIEW ───────────────────────── */
+#view-mindmap{overflow:hidden}
+canvas{display:block;position:absolute;inset:0;z-index:0}
+
+/* Labels */
+#labels{position:absolute;inset:0;z-index:1;pointer-events:none}
+.lbl{
+  position:absolute;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;
+  transition:opacity .18s ease;
+}
+.lbl-pill{
+  display:inline-block;
+  padding:3px 10px;
+  border-radius:100px;
+  background:rgba(10,16,34,0.82);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,0.10);
+  white-space:nowrap;
+}
+.lbl-text{
+  font-size:11px;font-weight:500;color:rgba(232,239,255,0.82);
+  line-height:1.3;letter-spacing:0.01em;
+}
+.lbl.core .lbl-pill{padding:5px 14px;border-color:rgba(255,213,122,0.30);background:rgba(10,16,34,0.88)}
+.lbl.core .lbl-text{font-size:13px;font-weight:650;color:var(--ink);letter-spacing:-0.01em}
+.lbl.principle .lbl-text{font-size:10.5px;color:rgba(171,141,255,0.92)}
+.lbl-dot{width:3px;height:3px;background:rgba(255,255,255,0.28);border-radius:50%;margin:4px auto 0}
+.lbl.dim .lbl-pill{opacity:0.28}
+.lbl.highlighted .lbl-text{color:var(--ink)}
+
+/* Tooltip */
+#tip{
+  position:fixed;z-index:50;pointer-events:none;
+  padding:5px 11px;border-radius:var(--r);
+  background:var(--surf2);border:1px solid var(--border);
+  font-size:11px;font-weight:500;color:var(--ink2);
+  display:flex;align-items:center;gap:5px;
+  opacity:0;transition:opacity .14s ease;
+  white-space:nowrap;
+}
+#tip.show{opacity:1}
+#tip svg{opacity:0.5;flex-shrink:0}
+
+/* Legend */
+#legend{
+  position:fixed;bottom:28px;right:28px;z-index:10;
+  display:flex;flex-direction:column;gap:7px;
+  background:rgba(10,16,34,0.75);backdrop-filter:blur(12px);
+  border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:12px 14px;
+}
+.leg-row{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:500;color:var(--muted)}
+.leg-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* Orbit hint */
+#hint{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:10;
+  display:flex;gap:18px;
+  background:rgba(10,16,34,0.75);backdrop-filter:blur(12px);
+  border:1px solid var(--border);border-radius:100px;
+  padding:8px 18px;
+}
+.hint-item{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:500;color:var(--muted)}
+.hint-key{
+  font-size:10px;font-weight:700;padding:2px 7px;
+  border-radius:5px;border:1px solid rgba(255,255,255,0.12);color:var(--muted);
+  background:rgba(255,255,255,0.05);line-height:1.4;
+}
+
+/* Panel */
+#panel{
+  position:fixed;top:52px;right:0;bottom:0;width:460px;z-index:100;
+  background:rgba(10,16,34,0.96);backdrop-filter:blur(24px);
+  border-left:1px solid var(--border);
+  transform:translateX(100%);transition:transform .32s cubic-bezier(.3,0,.2,1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#panel.open{transform:translateX(0)}
+
+.panel-top{
+  padding:22px 26px 18px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.panel-eyebrow{
+  font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  margin-bottom:7px;display:flex;align-items:center;gap:7px;
+}
+.panel-eyebrow .badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.panel-title{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-0.025em;line-height:1.2}
+.panel-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.panel-x{
+  position:absolute;top:18px;right:22px;
+  width:26px;height:26px;border-radius:7px;
+  background:var(--muted2);border:none;color:var(--muted);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all var(--t);
+}
+.panel-x:hover{background:var(--border);color:var(--ink)}
+
+.panel-scroll{
+  flex:1;overflow-y:auto;padding:22px 26px 32px;
+  scrollbar-width:thin;scrollbar-color:var(--muted2) transparent;
+}
+.panel-scroll::-webkit-scrollbar{width:3px}
+.panel-scroll::-webkit-scrollbar-thumb{background:var(--muted2)}
+
+/* Panel sections */
+.p-insight{
+  margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border);
+}
+.p-section{margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border)}
+.p-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.p-label{
+  font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;
+}
+.p-label svg{opacity:0.5}
+.p-insight-text{
+  font-size:14.5px;font-style:italic;color:var(--ink2);line-height:1.72;
+  letter-spacing:-0.005em;
+}
+.p-text{font-size:13px;color:var(--muted);line-height:1.72}
+.p-case{
+  font-size:13px;color:var(--ink2);line-height:1.72;
+  padding-left:14px;border-left:2px solid var(--c-core);
+}
+.conn-wrap{display:flex;flex-wrap:wrap;gap:5px}
+.conn-tag{
+  padding:3px 10px;border-radius:100px;font-size:10.5px;font-weight:600;
+  background:var(--surf2);border:1px solid var(--border);color:var(--muted);
+  cursor:pointer;transition:all var(--t);
+}
+.conn-tag:hover{background:var(--surf3);color:var(--ink);border-color:var(--muted)}
+
+/* ───────────────────────── REFERENCE VIEW ───────────────────────── */
+#view-ref{overflow-y:auto;overflow-x:hidden;background:transparent}
+.ref-wrap{max-width:1080px;margin:0 auto;padding:36px 40px 80px}
+
+/* Reference nav */
+.ref-tabs{
+  display:flex;gap:2px;background:rgba(10,16,34,0.78);border:1px solid var(--border);
+  border-radius:100px;padding:3px;width:fit-content;margin-bottom:32px;
+  backdrop-filter:blur(12px);
+}
+.rtab{
+  padding:7px 18px;border-radius:100px;border:none;cursor:pointer;
+  font-size:12px;font-weight:600;background:transparent;color:var(--muted);
+  transition:all var(--t);
+}
+.rtab.active{background:linear-gradient(135deg,rgba(133,169,255,.22),rgba(171,141,255,.18));border:1px solid rgba(171,141,255,.30);color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,0.3)}
+.rtab:not(.active):hover{color:var(--ink2)}
+
+.rtab-section{display:none}
+.rtab-section.active{display:block;animation:fi .22s ease}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* Ref hero */
+.ref-hero{
+  display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px;margin-bottom:32px;
+}
+.ref-hero-main{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:32px;backdrop-filter:blur(10px);
+}
+.ref-hero-side{display:grid;gap:12px}
+.r-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:5px 12px;border-radius:100px;
+  background:rgba(255,213,122,0.10);border:1px solid rgba(255,213,122,0.22);
+  font-size:10.5px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;
+  color:rgba(255,213,122,0.90);margin-bottom:14px;
+}
+.r-eyebrow-dot{width:5px;height:5px;border-radius:50%;background:var(--c-core)}
+.ref-h1{font-size:clamp(22px,3vw,34px);font-weight:750;color:var(--ink);letter-spacing:-0.03em;line-height:1.15;margin-bottom:10px}
+.ref-lead{font-size:14px;color:var(--muted);line-height:1.7;max-width:58ch}
+.stats-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);padding:22px;
+  backdrop-filter:blur(10px);
+}
+.stat-item{padding:12px 14px;border-radius:var(--r-lg);background:rgba(255,255,255,.04);border:1px solid var(--border)}
+.stat-n{font-size:26px;font-weight:750;color:var(--ink);letter-spacing:-0.03em;line-height:1;display:block;margin-bottom:4px}
+.stat-l{font-size:11px;color:var(--muted);line-height:1.4}
+.callout-box{
+  background:rgba(126,224,183,.07);border:1px solid rgba(126,224,183,.18);
+  border-radius:var(--r-xl);padding:18px 20px;font-size:13px;color:#E5FFF3;line-height:1.7;
+}
+.callout-box strong{color:#A8F0D4}
+
+/* Section headings */
+.ref-sh{margin:32px 0 16px}
+.ref-sh h2{font-size:20px;font-weight:700;letter-spacing:-0.02em;margin-bottom:3px;
+  background:linear-gradient(90deg,#E8EFFF 0%,#C9D7FF 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.ref-sh p{font-size:13px;color:var(--muted)}
+
+/* Arc phases */
+.arc{display:grid;gap:10px;margin-bottom:28px}
+.phase-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:22px 24px;display:grid;grid-template-columns:180px 1fr;gap:20px;
+  transition:border-color var(--t),background var(--t);backdrop-filter:blur(8px);
+}
+.phase-card:hover{border-color:rgba(255,255,255,0.22);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04))}
+.phase-num{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-core);margin-bottom:5px}
+.phase-title{font-size:15px;font-weight:700;color:var(--ink);line-height:1.3}
+.phase-rows{display:grid;gap:10px}
+.phase-row{display:grid;grid-template-columns:110px 1fr;gap:12px}
+.phase-lbl{font-size:11px;font-weight:700;color:var(--ink2)}
+.phase-val{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* Takeaway grid */
+.takeaway-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px}
+.tcard{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:20px 22px;transition:border-color var(--t),background var(--t);backdrop-filter:blur(8px);
+}
+.tcard:hover{border-color:rgba(255,255,255,0.22);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04))}
+.tcard-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.tcard-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1.35}
+.tcard-text{font-size:12.5px;color:var(--muted);line-height:1.65}
+
+/* Module cards — collapsible */
+.mod-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);
+  padding:0;margin-bottom:10px;transition:border-color var(--t),background var(--t);
+  backdrop-filter:blur(8px);overflow:hidden;
+}
+.mod-card:hover{border-color:rgba(255,255,255,0.20)}
+.mod-card-header{
+  padding:20px 24px;cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:14px;
+  transition:background var(--t);
+}
+.mod-card-header:hover{background:rgba(255,255,255,0.03)}
+.mod-card-header-meta{flex:1;min-width:0}
+.mod-card-chevron{
+  flex-shrink:0;color:var(--muted);
+  transition:transform 0.22s ease,color var(--t);
+}
+.mod-card.open .mod-card-chevron{transform:rotate(180deg);color:var(--ink2)}
+.mod-card-body{
+  display:none;padding:0 24px 22px;
+  border-top:1px solid rgba(255,255,255,0.07);
+}
+.mod-card.open .mod-card-body{display:block}
+.mod-top{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
+/* hide tags on narrower viewports in the header */
+@media(max-width:860px){.mod-card-header .mod-tags{display:none}}
+.mod-num{
+  min-width:38px;height:38px;border-radius:10px;
+  padding:0 10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:750;flex-shrink:0;
+  white-space:nowrap;letter-spacing:-0.01em;
+}
+.mod-meta{}
+.mod-title{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;line-height:1.25;margin-bottom:2px}
+.mod-sub{font-size:11.5px;color:var(--muted)}
+.mod-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.mtag{padding:3px 9px;border-radius:100px;font-size:10.5px;font-weight:600;background:var(--surf2);border:1px solid var(--border);color:var(--muted)}
+.mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mod-panel{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:var(--r-lg);padding:16px 18px}
+.mod-panel h4{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.mod-panel ul{padding-left:16px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.mod-panel li{margin-bottom:5px}
+.mod-insight{
+  margin-top:12px;padding:14px 16px;
+  border-radius:var(--r-lg);border-left:2px solid var(--c-core);
+  background:rgba(255,213,122,0.06);
+  font-size:12.5px;font-style:italic;color:#E8DFBA;line-height:1.7;
+}
+.mod-case{
+  margin-top:12px;padding:14px 16px;
+  border-radius:var(--r-lg);border-left:2px solid var(--c-prin);
+  background:rgba(171,141,255,0.06);
+  font-size:12.5px;color:var(--ink2);line-height:1.7;
+}
+.mod-case-lbl{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-prin);margin-bottom:5px}
+.mod-note{margin-top:12px;padding:12px 16px;border-radius:var(--r-lg);background:rgba(255,213,122,0.07);border:1px solid rgba(255,213,122,0.15);font-size:12px;color:#E8DFBA;line-height:1.6}
+.mod-note strong{color:#FFE4A0}
+
+/* Playbook */
+.play-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px}
+.play-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);padding:22px 24px;
+  backdrop-filter:blur(8px);transition:border-color var(--t),background var(--t);
+}
+.play-card:hover{border-color:rgba(255,255,255,0.20);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04))}
+.play-card-eyebrow{font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.play-card h3{font-size:14.5px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;margin-bottom:12px;line-height:1.3}
+.play-card ol,.play-card ul{padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.play-card li{margin-bottom:5px}
+.play-card li strong{color:var(--ink2)}
+.checklist{list-style:none;padding-left:0}
+.checklist li{display:flex;gap:8px;align-items:flex-start;margin-bottom:7px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.checklist li::before{content:'';width:15px;height:15px;border:1.5px solid var(--border);border-radius:4px;flex-shrink:0;margin-top:1px;background:var(--surf2)}
+
+/* Resources */
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+.res-card{
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));
+  border:1px solid var(--border);border-radius:var(--r-xl);padding:22px 24px;
+  backdrop-filter:blur(8px);transition:border-color var(--t),background var(--t);
+}
+.res-card:hover{border-color:rgba(255,255,255,0.20);background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04))}
+.res-card-eyebrow{font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.res-card h3{font-size:14.5px;font-weight:700;color:var(--ink);margin-bottom:12px;letter-spacing:-0.01em;line-height:1.3}
+.res-card ul{padding-left:16px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.res-card li{margin-bottom:5px}
+.res-card li strong{color:var(--ink2)}
+.agenda-table{width:100%;border-collapse:collapse;font-size:12.5px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--border)}
+.agenda-table thead{background:rgba(255,255,255,0.06)}
+.agenda-table th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.agenda-table td{padding:10px 16px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.5}
+.agenda-table tr:last-child td{border-bottom:none}
+.agenda-table td:first-child{color:var(--ink2);font-weight:600;white-space:nowrap}
+
+/* Footer */
+.ref-footer{text-align:center;padding:32px 0;font-size:11.5px;color:var(--muted)}
+
+/* Responsive */
+@media(max-width:768px){
+  .ref-hero,.mod-grid,.takeaway-grid,.play-grid,.res-grid{grid-template-columns:1fr}
+  .phase-card{grid-template-columns:1fr}
+  .phase-row{grid-template-columns:1fr}
+  .ref-wrap{padding:24px 18px 60px}
+  #legend{display:none}
+  #panel{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ───────── TOP NAV ───────── -->
+<nav id="top-nav">
+  <div class="nav-brand">
+    <span class="dot"></span>
+    MIT AI Product Program &nbsp;·&nbsp;
+    <span>Yijun</span>
+  </div>
+  <div class="view-switch">
+    <button class="vsw-btn active" data-view="mindmap" onclick="switchView('mindmap')">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="3" cy="5" r="2"/><circle cx="21" cy="5" r="2"/><circle cx="3" cy="19" r="2"/><circle cx="21" cy="19" r="2"/><path d="M5 5l5 5M14 14l5 5M5 19l5-5M14 10l5-5"/></svg>
+      Mindset Map
+    </button>
+    <button class="vsw-btn" data-view="ref" onclick="switchView('ref')">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-3-3v6M7 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2h-2"/><rect x="9" y="1" width="6" height="4" rx="1"/></svg>
+      Full Reference
+    </button>
+  </div>
+</nav>
+
+<!-- ───────── MINDMAP VIEW ───────── -->
+<div id="view-mindmap" class="view">
+  <canvas id="c"></canvas>
+  <div id="labels"></div>
+  <div id="tip">
+    <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>
+    Click to explore
+  </div>
+  <div id="hint">
+    <div class="hint-item"><span class="hint-key">Drag</span>Orbit</div>
+    <div class="hint-item"><span class="hint-key">Scroll</span>Zoom</div>
+    <div class="hint-item"><span class="hint-key">Click</span>Explore</div>
+  </div>
+  <div id="legend">
+    <div class="leg-row"><div class="leg-dot" style="background:#FFD57A;box-shadow:0 0 5px #FFD57A55"></div>Core Essence</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#AB8DFF;box-shadow:0 0 5px #AB8DFF55"></div>5 Principles</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#7EE0B7;box-shadow:0 0 5px #7EE0B755"></div>Foundations</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#85A9FF;box-shadow:0 0 5px #85A9FF55"></div>Applications</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#6EC4E8;box-shadow:0 0 5px #6EC4E855"></div>Human Systems</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#FF8DAB;box-shadow:0 0 5px #FF8DAB55"></div>Ethics & Scale</div>
+  </div>
+  <div id="panel">
+    <div class="panel-top">
+      <div id="p-ey" class="panel-eyebrow"></div>
+      <div id="p-title" class="panel-title"></div>
+      <div id="p-sub" class="panel-sub"></div>
+      <button class="panel-x" onclick="closePanel()">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="panel-scroll" id="p-body"></div>
+  </div>
+</div>
+
+<!-- ───────── REFERENCE VIEW ───────── -->
+<div id="view-ref" class="view hidden">
+<div class="ref-wrap">
+
+  <!-- Hero -->
+  <div class="ref-hero">
+    <div class="ref-hero-main">
+      <div class="r-eyebrow"><span class="r-eyebrow-dot"></span>MIT AI Product Program · Knowledge Share</div>
+      <h1 class="ref-h1">A practical guide for designing, evaluating, and shipping AI products.</h1>
+      <p class="ref-lead">Nine modules translated into product and design language — connecting AI theory with practical implications for framing opportunities, choosing methods, designing trustworthy interfaces, and creating a real path from pilot to value.</p>
+    </div>
+    <div class="ref-hero-side">
+      <div class="stats-grid">
+        <div class="stat-item"><span class="stat-n">4</span><div class="stat-l">AI design stages as a structural backbone</div></div>
+        <div class="stat-item"><span class="stat-n">5</span><div class="stat-l">Cognitive processes for human+AI systems</div></div>
+        <div class="stat-item"><span class="stat-n">3</span><div class="stat-l">HCI areas: device, modality, application</div></div>
+        <div class="stat-item"><span class="stat-n">1</span><div class="stat-l">Through-line: AI succeeds when tied to real workflows</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ref tabs -->
+  <div class="ref-tabs">
+    <button class="rtab active" onclick="switchRefTab('overview',this)">Overview</button>
+    <button class="rtab" onclick="switchRefTab('modules',this)">Modules</button>
+    <button class="rtab" onclick="switchRefTab('playbook',this)">Playbook</button>
+    <button class="rtab" onclick="switchRefTab('resources',this)">Resources</button>
+  </div>
+
+  <!-- OVERVIEW TAB -->
+  <div id="rtab-overview" class="rtab-section active">
+    <div class="ref-sh"><h2>The program in one arc</h2><p>What the full curriculum adds up to when translated into product and design language.</p></div>
+    <div class="arc">
+      <div class="phase-card">
+        <div><div class="phase-num">Phase 1</div><div class="phase-title">Start with behavior, not hype</div></div>
+        <div class="phase-rows">
+          <div class="phase-row"><div class="phase-lbl">Main idea</div><div class="phase-val">The opening modules frame AI as a design problem before a technology choice. The first question is what intelligence the system needs to exhibit, what scope it covers, and how success gets measured. Covers M1–M3.</div></div>
+          <div class="phase-row"><div class="phase-lbl">Why it matters</div><div class="phase-val">This stops teams from beginning with a fashionable model and forcing it into a problem. The frame prevents the most common — and most expensive — AI failure mode.</div></div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div><div class="phase-num">Phase 2</div><div class="phase-title">Learn the technical stack well enough to make better decisions</div></div>
+        <div class="phase-rows">
+          <div class="phase-row"><div class="phase-lbl">Main idea</div><div class="phase-val">ML, deep learning, transformer, and GAN modules are decision tools for product teams: what kind of problem fits which method, where data is the bottleneck, when complexity is justified. Covers M4–M5.</div></div>
+          <div class="phase-row"><div class="phase-lbl">Why it matters</div><div class="phase-val">Teams make stronger choices when they know when simple prediction is enough, when generation needs grounding, and when the model is not the hardest part.</div></div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div><div class="phase-num">Phase 3</div><div class="phase-title">Design the interaction layer and the human system around the model</div></div>
+        <div class="phase-rows">
+          <div class="phase-row"><div class="phase-lbl">Main idea</div><div class="phase-val">HCI and Superminds modules extend AI work beyond output quality — into interface design, trust, user control, team cognition, and the role of computers within larger human decision systems. Covers M6–M7.</div></div>
+          <div class="phase-row"><div class="phase-lbl">Why it matters</div><div class="phase-val">Even an accurate model fails if the interface is unclear, the automation level is wrong, or the human role is poorly designed. The interaction layer is the product.</div></div>
+        </div>
+      </div>
+      <div class="phase-card">
+        <div><div class="phase-num">Phase 4</div><div class="phase-title">Govern what you build — and design for what's next</div></div>
+        <div class="phase-rows">
+          <div class="phase-row"><div class="phase-lbl">Main idea</div><div class="phase-val">The final research module examines GANs and synthetic media as the frontier of AI's dual-use problem — where the same capability enables both creative breakthroughs and significant societal harm. Covers M8.</div></div>
+          <div class="phase-row"><div class="phase-lbl">Why it matters</div><div class="phase-val">Governance gap is a design failure, not a policy problem. Disclosure architecture, consent design, and ethics frameworks applied before deployment — not after — define whether an AI product is trustworthy.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-sh"><h2>Six program-wide takeaways</h2><p>The strongest reusable lessons across all nine modules.</p></div>
+    <div class="takeaway-grid">
+      <div class="tcard"><div class="tcard-label">Strategy</div><div class="tcard-title">Frame AI through outcomes, scope, and data reality</div><div class="tcard-text">Start by identifying the target behavior, the business outcome, the KPI, the scope of the problem, and the data required. This is more reliable than starting with a preferred model or vendor.</div></div>
+      <div class="tcard"><div class="tcard-label">Execution</div><div class="tcard-title">Complementary assets create real value</div><div class="tcard-text">The model itself is rarely the full source of advantage. Workflow redesign, domain expertise, governance, UX, and maintenance are what turn raw model capability into usable product value.</div></div>
+      <div class="tcard"><div class="tcard-label">GenAI</div><div class="tcard-title">Generative AI must usually be grounded</div><div class="tcard-text">LLMs are versatile, but context limits, hallucination risk, and variability mean that retrieval, structure, tools, and review are often required for dependable product use.</div></div>
+      <div class="tcard"><div class="tcard-label">UX / HCI</div><div class="tcard-title">Interface quality shapes trust as much as model quality</div><div class="tcard-text">Good AI experiences make uncertainty legible, preserve user control, reduce effort, and support correction. Poor AI UX destroys confidence even when the model is competent.</div></div>
+      <div class="tcard"><div class="tcard-label">Human + AI</div><div class="tcard-title">Think people + computers, not people vs. computers</div><div class="tcard-text">AI works best when it strengthens group memory, synthesis, option generation, and decision quality inside a broader human system — not when it automates away human judgment.</div></div>
+      <div class="tcard"><div class="tcard-label">Strategy</div><div class="tcard-title">Performance benchmarks evolve fast — design for iteration</div><div class="tcard-text">Benchmark performance shifts quickly. Product and platform teams should design for iteration rather than assume a static ceiling on AI capability.</div></div>
+    </div>
+  </div>
+
+  <!-- MODULES TAB -->
+  <div id="rtab-modules" class="rtab-section">
+    <div class="ref-sh"><h2>Module walkthrough</h2><p>Click any module to expand. Each translated into practical product and design language.</p></div>
+
+    <!-- M1 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(126,224,183,0.12);color:#7EE0B7;flex-shrink:0">01</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">AI Product Design Foundations</div>
+          <div class="mod-sub">AI categories, four design stages, value creation, scope, performance targets</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">Strategy</span><span class="mtag">Foundations</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>AI product design begins by defining the behavior the system should achieve — not by choosing a model first.</li><li>Four design activities: desired behavior, business process fit, data and model choices, and development planning.</li><li>AI value often comes from pairing the model with complementary business-process changes, not from the model alone.</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> Define the exact user-facing behavior before discussing model class, vendor, or architecture.</li><li><strong>Product:</strong> "Make the workflow smarter" is a much weaker goal than "reduce triage time by 30% while maintaining accuracy."</li><li><strong>Execution:</strong> Gives a shared language for AI conversations across PM, Engineering, and Leadership.</li></ul></div>
+        </div>
+        <div class="mod-insight">"AI product work is part problem framing, part system design, and part business design. It should never be reduced to 'add AI here.'"</div>
+      </div>
+    </div>
+
+    <!-- M2–3 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(126,224,183,0.12);color:#7EE0B7;flex-shrink:0">02–03</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">ML Algorithms & Deep Learning</div>
+          <div class="mod-sub">Supervised, unsupervised, classification, regression, CNNs, RNNs, training intuition</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">Model fit</span><span class="mtag">Evaluation</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>Match the method to the problem: regression for continuous outputs, classification for labels, clustering for hidden structure.</li><li>ML lifecycle discipline: train/validate/test partitioning, overfitting, bias-variance tradeoffs, hyperparameter tuning.</li><li>Deep learning extends ML through multilayer networks. CNNs suit spatial data; RNNs suit sequences. Complexity only justifies when generalization improves.</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> Many business problems do not require deep learning. A simpler model may be better if it solves the workflow clearly.</li><li><strong>Product:</strong> Strong demo performance on familiar data means little if the model fails on production variation.</li><li><strong>Execution:</strong> Algorithm choice is a promise about explainability — decision trees give receipts; neural nets give verdicts.</li></ul></div>
+        </div>
+        <div class="mod-insight">"Use deep learning when pattern complexity requires it, not as a prestige default. The simplest model that solves the problem is usually the right model."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point</div>Applied rigorous train/validate/test discipline on real datasets. Compared decision tree versus neural network on the same problem — the simpler model was often sufficient and always more defensible in a cross-functional review.</div>
+      </div>
+    </div>
+
+    <!-- M4 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(133,169,255,0.12);color:#85A9FF;flex-shrink:0">04</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">Designing AI for Superhuman Performance</div>
+          <div class="mod-sub">Superhuman targets, data augmentation, ethics, consent, crowdsourcing</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">High-stakes AI</span><span class="mtag">Ethics</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>Frame AI design around a precisely defined performance target — including "superhuman" benchmarks against real expert performance.</li><li>Scope specificity matters: what exact condition, decision, or stage is the system responsible for?</li><li>Data augmentation for small samples, transfer learning, IRB approvals, informed consent, and crowdsourced annotation with fairness guardrails.</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> In high-stakes domains, performance requirements should be defined against real operational risk, not benchmark curiosity.</li><li><strong>Product:</strong> The sharper the target behavior, the more coherent the data strategy and evaluation plan become.</li><li><strong>Execution:</strong> Ethics, consent, and privacy are design constraints from day one — not legal clean-up at the end.</li></ul></div>
+        </div>
+        <div class="mod-insight">"The most important design work happened before any code. Defining 'better than a radiologist at early-stage motor decline' is a product brief — with a user, a metric, and a use case."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point — Early Alzheimer's Detection</div>ML classifier built on motor function data using ResNet with augmentation for small clinical samples. Crowdsourced annotation was designed with fairness guardrails. IRB requirements and informed consent were treated as quality-improving design constraints — not administrative overhead.</div>
+      </div>
+    </div>
+
+    <!-- M5 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(133,169,255,0.12);color:#85A9FF;flex-shrink:0">05</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">Generative AI & Transformers</div>
+          <div class="mod-sub">Tokenisation, embeddings, attention, RAG, chain-of-thought, agents</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">GenAI</span><span class="mtag">LLMs</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>Transformers process language through tokenisation, embeddings, contextual encoding via attention, and probabilistic generation.</li><li>Prompting alone is insufficient for most real product tasks. RAG, chain-of-thought, tool use, and agent orchestration each address specific limitations.</li><li>Hallucination is a product risk that shapes UX, content boundaries, and review patterns — not just a model bug.</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> Treat GenAI as a system architecture choice — real products need prompt + retrieval + tools + verification + fallback.</li><li><strong>Product:</strong> The strongest use cases are constrained: grounded Q&A, structured drafting, summarisation with review — not open-ended chat.</li><li><strong>Execution:</strong> Reliability comes from orchestration around the model, not from the model alone.</li></ul></div>
+        </div>
+        <div class="mod-insight">"Prompt engineering is information architecture. You are structuring what the model attends to, in what sequence, with what constraints. The IA migrated from navigation menus to natural language. Same discipline. Higher stakes."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point — Medical Consultation AI</div>Prompts designed for a sensitive health consultation use case, with RAG pipeline for domain-specific grounding. Key design constraint: the hallucination failure state — when the model is confidently wrong, does the user have a clear recovery path?</div>
+      </div>
+    </div>
+
+    <!-- M6 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(110,196,232,0.12);color:#6EC4E8;flex-shrink:0">06</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">Designing Intelligent Human-Computer Interfaces</div>
+          <div class="mod-sub">HCI foundations, devices, modalities, applications, adaptive interfaces, trust</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">UX / HCI</span><span class="mtag">Trust</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>Three HCI areas: building new devices, defining interaction techniques and modalities, and designing applications for specific users and contexts.</li><li>AI can improve personalisation, prediction, and assistance — but also fails visibly in speech, automation, and action-taking systems.</li><li>Critical question: how much AI involvement are people comfortable with when the system moves from sensing to acting?</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> AI UX must be evaluated at the interaction level. Users experience the system through clarity, control, and feedback — not model accuracy.</li><li><strong>Product:</strong> Good AI interaction makes uncertainty understandable, helps users recover from errors, and avoids over-automation.</li><li><strong>Execution:</strong> Interface design is part of intelligence design. Trust, effort, and legibility are product requirements.</li></ul></div>
+        </div>
+        <div class="mod-insight">"Who is the user of an alert? The AI generates one signal. Three stakeholders have three incompatible needs. Deciding who gets what, in what form, at what threshold — that is the design work. Not the algorithm."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point — Elderly Care Monitoring</div>A multi-stakeholder alert system for falls, medication errors, dehydration, and cardiac anomalies — with three distinct alert architectures: patient-facing (dignity-preserving), family-facing (contextual), clinical-facing (protocol-formatted). The three-user notification trilemma resolved through role-based information design.</div>
+      </div>
+    </div>
+
+    <!-- M7 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(110,196,232,0.12);color:#6EC4E8;flex-shrink:0">07</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">Superminds: Org Design as AI Design</div>
+          <div class="mod-sub">People + computers, five cognitive processes, five supermind types</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">Human + AI</span><span class="mtag">Collaboration</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>The key shift: from "humans in the loop" to "computers in the group." AI is part of a collective intelligence system.</li><li>Five cognitive processes: create possibilities, decide, sense the world, remember, and learn.</li><li>Five supermind types — hierarchies, democracies, markets, communities, ecosystems — each optimising for different cognitive bottlenecks.</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> AI opportunities often sit in team cognition: better synthesis, memory, option generation, prioritisation, forecasting.</li><li><strong>Product:</strong> Designing for group workflow can be more valuable than a single-user tool when decisions are collective.</li><li><strong>Execution:</strong> Every product feature is a silent organisational redesign. That shift should be explicit — not accidental.</li></ul></div>
+        </div>
+        <div class="mod-insight">"When you add a recommendation engine, you shift cognitive work from user judgment to machine prediction. That shift should be named, deliberated, and owned."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point — Collective Intelligence Design</div>Organisational processes redesigned using supermind frameworks for collective decision-making. Prediction market logic applied to strategic risk — aggregated forecasts significantly outperformed individual expert judgment. A community supermind failure was traced to mismatching structure to problem type.</div>
+      </div>
+    </div>
+
+    <!-- M8 -->
+    <div class="mod-card" onclick="toggleMod(this)">
+      <div class="mod-card-header">
+        <div class="mod-num" style="background:rgba(255,141,171,0.12);color:#FF8DAB;flex-shrink:0">08</div>
+        <div class="mod-card-header-meta">
+          <div class="mod-title">GANs, Synthetic Media & Ethical Frontiers</div>
+          <div class="mod-sub">Generative adversarial networks, deepfakes, sustainability, feasibility, responsibility</div>
+        </div>
+        <div class="mod-tags" style="margin:0;flex-shrink:0"><span class="mtag">GANs</span><span class="mtag">Ethics</span></div>
+        <div class="mod-card-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+      </div>
+      <div class="mod-card-body">
+        <div class="mod-grid" style="margin-top:16px">
+          <div class="mod-panel"><h4>What it teaches</h4><ul><li>GANs use adversarial training between a generator and a discriminator to reach a high-quality synthesis equilibrium.</li><li>Applications: super-resolution, style transfer, deepfakes, historical restoration, medical data synthesis.</li><li>Three-pillar ethics framework: sustainability (long-term viability), feasibility (technical + economic), responsibility (societal impact + accountability).</li></ul></div>
+          <div class="mod-panel"><h4>Why it matters</h4><ul><li><strong>Design:</strong> GANs are the canonical dual-use technology. The same capability that restores archival photos produces undetectable political deepfakes.</li><li><strong>Product:</strong> Governance gap is a design failure, not a policy problem. Ethics framework applied before deployment — not after harm.</li><li><strong>Execution:</strong> Disclosure architecture matters more than detection accuracy in the arms race against synthetic media.</li></ul></div>
+        </div>
+        <div class="mod-insight">"The designer's job is not to solve the trolley problem. It's to build systems that make the scenario less likely — and to be rigorously transparent about how the system behaves when it can't be avoided."</div>
+        <div class="mod-case"><div class="mod-case-lbl">Case in Point — Autonomous Vehicle Ethics</div>AV ethical policy designed through the Moral Machine interface. TecoGAN evaluated for archival restoration use. Huru.ai assessed for interview coaching effectiveness and demographic bias in feedback. Key finding: disclosure architecture matters more than detection accuracy in synthetic media governance.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAYBOOK TAB -->
+  <div id="rtab-playbook" class="rtab-section">
+    <div class="ref-sh"><h2>Practical playbook</h2><p>Reusable patterns and checklists derived from the program.</p></div>
+    <div class="play-grid">
+      <div class="play-card">
+        <div class="play-card-eyebrow">Strategy</div>
+        <h3>AI Opportunity Framing</h3>
+        <ol>
+          <li>Describe the user or business problem in plain language.</li>
+          <li>State the desired system behavior precisely.</li>
+          <li>Define the KPI and the user-visible impact.</li>
+          <li>List what data exists, what is missing, and what is expensive to obtain.</li>
+          <li>Choose the method family only after the above is clear: predictive, classificatory, generative, agentic.</li>
+          <li>Define "done" before architecture discussions begin.</li>
+        </ol>
+      </div>
+      <div class="play-card">
+        <div class="play-card-eyebrow">Pre-build checklist</div>
+        <h3>Before You Build — 7 Questions</h3>
+        <ul class="checklist">
+          <li>Is the problem precisely defined with measurable success criteria?</li>
+          <li>Is there sufficient, representative, high-quality data available?</li>
+          <li>Is domain expertise (not just technical expertise) on the team?</li>
+          <li>Have ethics, consent, privacy, and accountability been addressed?</li>
+          <li>Does the AI enhance human judgment — not replace it inappropriately?</li>
+          <li>Does the team and org structure match the intelligence type needed?</li>
+          <li>Is there a monitoring, retraining, and deprecation plan?</li>
+        </ul>
+      </div>
+      <div class="play-card">
+        <div class="play-card-eyebrow">UX / HCI</div>
+        <h3>HCI Design Principles for AI</h3>
+        <ul>
+          <li><strong>Make uncertainty legible.</strong> Users should know when the AI is guessing.</li>
+          <li><strong>Preserve user agency.</strong> Always provide a path to override, correct, or escalate.</li>
+          <li><strong>Design the handoff explicitly.</strong> Where machine confidence gives way to human judgment is a design decision.</li>
+          <li><strong>Error recovery first.</strong> Design the failure state before the success state.</li>
+          <li><strong>Transparency is a feature.</strong> Disclose when AI is involved in decisions that affect users.</li>
+        </ul>
+      </div>
+      <div class="play-card">
+        <div class="play-card-eyebrow">Ethics</div>
+        <h3>Ethics Framework — Three Pillars</h3>
+        <ul>
+          <li><strong>Sustainability.</strong> Viable long-term without causing harm? Consider societal effects and long-term trust.</li>
+          <li><strong>Feasibility.</strong> Technically and economically practical? Assess maintenance burden, data availability, team capability.</li>
+          <li><strong>Responsibility.</strong> Who is accountable when things go wrong? Consent, privacy, and disclosure are non-negotiable.</li>
+        </ul>
+        <div class="mod-note"><strong>Apply before deployment.</strong> Ethics retrofitted post-launch costs orders of magnitude more than ethics designed in from the start.</div>
+      </div>
+      <div class="play-card">
+        <div class="play-card-eyebrow">Human + AI systems</div>
+        <h3>Supermind Selection Guide</h3>
+        <ul>
+          <li><strong>Execution at scale →</strong> Hierarchy with AI coordination tools.</li>
+          <li><strong>Strategic forecasting →</strong> Market supermind + prediction aggregation.</li>
+          <li><strong>Diverse option generation →</strong> Community or ecosystem with AI synthesis.</li>
+          <li><strong>Democratic decisions →</strong> Democracy supermind with AI facilitation.</li>
+          <li><strong>Long-term innovation →</strong> Ecosystem design with internal + external contributors.</li>
+        </ul>
+        <div class="mod-note"><strong>Key question:</strong> Which cognitive process is the bottleneck — perception, judgment, prediction, planning, or coordination? Match structure to gap.</div>
+      </div>
+      <div class="play-card">
+        <div class="play-card-eyebrow">GenAI</div>
+        <h3>GenAI Product Patterns</h3>
+        <ul>
+          <li><strong>For accuracy:</strong> RAG — ground responses in retrieved facts, not model memory.</li>
+          <li><strong>For complex reasoning:</strong> Chain-of-thought — ask the model to reason step by step.</li>
+          <li><strong>For multi-step tasks:</strong> Agentic systems — define goal, plan, tools, and reflection loop.</li>
+          <li><strong>For reliability:</strong> Add verification layers, structured output, and human review checkpoints.</li>
+          <li><strong>For trust:</strong> Always design for the hallucination failure state.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESOURCES TAB -->
+  <div id="rtab-resources" class="rtab-section">
+    <div class="ref-sh"><h2>Resources</h2><p>Research tracks to follow and team activities to run with these ideas.</p></div>
+    <div class="res-grid">
+      <div class="res-card">
+        <div class="res-card-eyebrow">Academic research</div>
+        <h3>Research tracks to keep watching</h3>
+        <ul>
+          <li><strong>CHI</strong> — broad HCI, usability, human factors, societal impact</li>
+          <li><strong>UIST</strong> — frontier interaction techniques and technical invention</li>
+          <li><strong>IUI</strong> — intelligent user interfaces and adaptive systems</li>
+          <li><strong>FAccT</strong> — fairness, accountability, transparency in AI</li>
+          <li><strong>NeurIPS / ICML</strong> — model advances worth tracking for product implications</li>
+        </ul>
+      </div>
+      <div class="res-card">
+        <div class="res-card-eyebrow">Team activities</div>
+        <h3>Apply this with your team</h3>
+        <ul>
+          <li>AI opportunity framing workshop using the 7-question checklist</li>
+          <li>Supermind audit of current team workflows — where is the cognitive bottleneck?</li>
+          <li>Prompt engineering sprint for one existing product feature</li>
+          <li>Ethics pre-mortem for any AI initiative currently in scoping</li>
+          <li>Interface audit: where does AI involvement become opaque to users?</li>
+        </ul>
+      </div>
+      <div class="res-card">
+        <div class="res-card-eyebrow">Key concepts</div>
+        <h3>Glossary — terms worth sharing</h3>
+        <ul>
+          <li><strong>RAG</strong> — Retrieval-Augmented Generation; grounds LLM outputs in retrieved facts</li>
+          <li><strong>Chain-of-thought</strong> — prompting pattern that makes model reasoning explicit and auditable</li>
+          <li><strong>Supermind</strong> — people + computers working together as a collective intelligence unit</li>
+          <li><strong>Dual-use</strong> — technology whose capability enables both beneficial and harmful applications simultaneously</li>
+          <li><strong>Data drift</strong> — gradual shift in input distribution that degrades model performance over time</li>
+        </ul>
+      </div>
+      <div class="res-card">
+        <div class="res-card-eyebrow">Design principles</div>
+        <h3>Principles to keep visible</h3>
+        <ul>
+          <li>Define the problem before the model, every time</li>
+          <li>Data quality is a design decision, not an engineering problem</li>
+          <li>The handoff between human judgment and machine prediction is a design decision</li>
+          <li>Ethics embedded early costs a meeting; ethics retrofitted costs a company</li>
+          <li>The launch is the beginning — design for the full lifecycle</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="ref-footer">MIT AI Product Design Program · Yijun · 2026</div>
+</div>
+</div>
+
+<script>
+// ───────── VIEW SWITCH ─────────
+let currentView = 'mindmap';
+function switchView(v) {
+  currentView = v;
+  document.getElementById('view-mindmap').classList.toggle('hidden', v !== 'mindmap');
+  document.getElementById('view-ref').classList.toggle('hidden', v !== 'ref');
+  document.querySelectorAll('.vsw-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  isPaused = (v !== 'mindmap');
+}
+function toggleMod(card) {
+  // Don't toggle if click was on a child interactive element
+  card.classList.toggle('open');
+}
+function switchRefTab(id, btn) {
+  document.querySelectorAll('.rtab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.rtab').forEach(b => b.classList.remove('active'));
+  document.getElementById('rtab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ───────── THREE.JS DATA ─────────
+function sph(az, el, r) {
+  const a = az * Math.PI / 180, e = el * Math.PI / 180;
+  return [r * Math.cos(e) * Math.cos(a), r * Math.sin(e), r * Math.cos(e) * Math.sin(a)];
+}
+const COL = { CORE:0xFFD57A, PRIN:0xAB8DFF, TECH:0x7EE0B7, APP:0x85A9FF, HUM:0x6EC4E8, ETH:0xFF8DAB };
+
+const NODES = [
+  { id:'core',  type:'core',      lbl:'AI × Design\nMindset',       pos:[0,0,0],          sz:1.0,  col:COL.CORE, conns:['p1','p2','p3','p4','p5'] },
+  { id:'p1',    type:'principle', lbl:'Problem\nFirst',              pos:sph(36,0,2.8),    sz:0.38, col:COL.PRIN, conns:['m1','m4','m7','m9'] },
+  { id:'p2',    type:'principle', lbl:'Human+AI\nPartnership',       pos:sph(108,0,2.8),   sz:0.38, col:COL.PRIN, conns:['m4','m6','m7','m8'] },
+  { id:'p3',    type:'principle', lbl:'Data as\nStrategy',           pos:sph(180,0,2.8),   sz:0.38, col:COL.PRIN, conns:['m1','m23','m4','m9'] },
+  { id:'p4',    type:'principle', lbl:'Ethics as\nArchitecture',     pos:sph(252,0,2.8),   sz:0.38, col:COL.PRIN, conns:['m4','m6','m8','m9'] },
+  { id:'p5',    type:'principle', lbl:'Full\nLifecycle',             pos:sph(324,0,2.8),   sz:0.38, col:COL.PRIN, conns:['m7','m9'] },
+  { id:'m1',    type:'module',    lbl:'AI Design\nProcess',          pos:sph(0,15,5.5),    sz:0.26, col:COL.TECH, conns:['m23'] },
+  { id:'m23',   type:'module',    lbl:'ML & Deep\nLearning',         pos:sph(45,-12,5.5),  sz:0.26, col:COL.TECH, conns:['m4'] },
+  { id:'m4',    type:'module',    lbl:'Superhuman\nAI',              pos:sph(90,18,5.5),   sz:0.26, col:COL.APP,  conns:['m5'] },
+  { id:'m5',    type:'module',    lbl:'Generative\nAI',              pos:sph(135,-8,5.5),  sz:0.26, col:COL.APP,  conns:['m8'] },
+  { id:'m6',    type:'module',    lbl:'HCI &\nInteraction',          pos:sph(180,15,5.5),  sz:0.26, col:COL.HUM,  conns:['m7'] },
+  { id:'m7',    type:'module',    lbl:'Superminds\n& Org Design',    pos:sph(225,-18,5.5), sz:0.26, col:COL.HUM,  conns:['m9'] },
+  { id:'m8',    type:'module',    lbl:'GANs &\nEthics',              pos:sph(270,8,5.5),   sz:0.26, col:COL.ETH,  conns:['m9'] },
+  { id:'m9',    type:'module',    lbl:'Business\nCase & Scale',      pos:sph(315,-12,5.5), sz:0.26, col:COL.ETH,  conns:[] },
+];
+
+const CONTENT = {
+  core:{ badge:'Core Essence', color:'#C4A870', sub:'The unified lens across all 9 modules',
+    insight:`AI product design is a systems design practice — where algorithms, data, organisations, interfaces, and ethics are all design materials, each carrying equal weight. The designer's job is to hold the whole system accountable.`,
+    theory:`One through-line connects all 9 modules: problem clarity → data strategy → model performance → interface quality → user outcomes → business value. Every AI failure traces to one broken link. Finding and repairing that link is the core of the work.`,
+    case:`The full program arc: from training a first classifier to applying disruption theory — from understanding backpropagation to asking which markets AI reshapes, and what the cost is to whom.`,
+    conns:['p1','p2','p3','p4','p5'] },
+
+  p1:{ badge:'Principle 01', color:'#9290C8', sub:'Runs through M1, M4, M7, M9',
+    insight:`Most AI failures are not algorithm failures. They are problem-definition failures. The model optimised perfectly for the wrong objective. Define the target before designing the path — no exceptions.`,
+    theory:`Appears at every scale: M1's process model starts with problem definition. M4's benchmark is written before data collection. M9's business case opens with baseline quantification. The constraint is universal.`,
+    conns:['core','m1','m4','m7','m9'] },
+
+  p2:{ badge:'Principle 02', color:'#9290C8', sub:'Runs through M4, M6, M7, M8',
+    insight:`The handoff between human judgment and machine prediction is not a technical boundary — it is a design decision. Place it wrongly and you create accountability gaps that fail catastrophically and silently.`,
+    theory:`M6: AI enhances, not replaces, human judgment. M7: cognitive work is allocated intentionally. M8: human-in-the-loop is a feature, not a fallback. The handoff point is where the product's ethical integrity lives.`,
+    conns:['core','m4','m6','m7','m8'] },
+
+  p3:{ badge:'Principle 03', color:'#9290C8', sub:'Runs through M1, M2, M3, M4, M9',
+    insight:`The algorithm is commoditising. The data — rare, labelled, governed, domain-specific — is not. Competitive advantage lives in the collection methodology, not the model architecture.`,
+    theory:`Data quality decisions made at project start set the ceiling for everything downstream. M4's augmentation strategies and M9's governance framework share one premise: invest in data discipline before model selection.`,
+    conns:['core','m1','m23','m4','m9'] },
+
+  p4:{ badge:'Principle 04', color:'#9290C8', sub:'Runs through M4, M6, M8, M9',
+    insight:`Ethics designed in at the start costs a meeting. Ethics remediated after harm costs a company. The choice of timing is itself a design decision.`,
+    theory:`M4: IRB and consent as quality-improving constraints. M8: three-pillar framework applied before deployment. M9: ethics embedded in feasibility analysis. Treat ethics as a specification, not a compliance checkpoint.`,
+    conns:['core','m4','m6','m8','m9'] },
+
+  p5:{ badge:'Principle 05', color:'#9290C8', sub:'Runs through M7, M9',
+    insight:`The product you design is not the product you deploy. The product you deploy is not the product you maintain 18 months later. Design for all three versions, not just the first.`,
+    theory:`Model decay is the physics of data-driven systems. Business cases that include 18-month maintenance projections look fundamentally different from those that stop at launch. Plan for retraining from day one.`,
+    conns:['core','m7','m9'] },
+
+  m1:{ badge:'Module 01', color:'#5A9880', sub:'AI Product Design Foundations',
+    insight:`The 4-stage model is a behavioral contract, not a development framework. Specifying what the system will do must be written in design language before it becomes engineering language.`,
+    theory:`Problem → Data → Model → Deploy. Not a waterfall — a feedback loop. Deployment failures reveal model flaws. Model flaws reveal data gaps. Data gaps reveal problem misframing. Iterate on the earliest stage first.`,
+    case:`NLP evaluation framework applied to an existing AI product — mapping stated business requirements against technical implementation. Found three points where the two had silently diverged without anyone noticing.`,
+    conns:['core','p1','p3','m23'] },
+
+  m23:{ badge:'Modules 02–03', color:'#5A9880', sub:'ML Algorithms & Deep Learning',
+    insight:`Every ML algorithm is a contract about explainability. Decision trees give receipts. Neural nets give verdicts. Algorithm choice is a promise about accountability — not just performance.`,
+    theory:`Start simple. Linear first. Decision tree second. Escalate to deep learning only when simpler models demonstrably fail. Complex models cost more to train, explain, maintain, and defend.`,
+    case:`Classifiers trained on real datasets with rigorous train/validate/test discipline. Decision tree versus neural network compared on the same problem — the simpler model was often sufficient and always more defensible in a cross-functional review.`,
+    conns:['core','p3','m1','m4'] },
+
+  m4:{ badge:'Module 04', color:'#8880C4', sub:'Alzheimer\'s Detection · Superhuman AI',
+    insight:`The most important design work happened before any code. Defining "better than a radiologist at early-stage motor decline" is a product brief — with a user, a metric, and a use case. The brief precedes and shapes the model.`,
+    theory:`Superhuman performance = precisely defined benchmark + domain augmentation for small datasets + transfer learning + mandatory expert validation. Not just metric optimisation.`,
+    case:`ML classifier built for early Alzheimer's detection on motor function data. ResNet applied with augmentation for small clinical sample constraints. Crowdsourced annotation designed with fairness guardrails. IRB and informed consent treated as quality-improving design constraints — not overhead.`,
+    conns:['core','p1','p2','p3','p4','m23','m5'] },
+
+  m5:{ badge:'Module 05', color:'#8880C4', sub:'Health Consultation AI · Generative AI',
+    insight:`Prompt engineering is information architecture. You are structuring what the model attends to, in what sequence, with what constraints. The IA migrated from navigation menus to natural language. Same discipline. Higher stakes.`,
+    theory:`RAG grounds outputs in retrievable facts — critical when hallucination has real consequences. Chain-of-thought makes reasoning auditable. Each pattern has specific failure modes that must be designed for, not assumed away.`,
+    case:`Prompts designed for a sensitive medical consultation use case, with RAG pipeline for domain-specific grounding. The hallucination failure state treated as a first-class design problem: when the model is confidently wrong, does the user have a clear recovery path?`,
+    conns:['core','p1','p3','m4','m8'] },
+
+  m6:{ badge:'Module 06', color:'#5AAAB8', sub:'Silent Risk Moments · HCI Design',
+    insight:`Who is the user of an alert? The AI generates one signal. Three stakeholders have three incompatible needs. Deciding who gets what, in what form, at what threshold — that is the design work. Not the algorithm.`,
+    theory:`HCI for AI means designing the moment of handoff — where machine confidence meets human judgment. Transparency about when the AI is guessing is not a weakness. It is the feature that enables appropriate oversight.`,
+    case:`A 'Silent Risk Moments' system designed for falls, medication errors, dehydration, and cardiac anomalies. Three distinct alert architectures: patient-facing (dignity-preserving), family-facing (contextual), clinical-facing (protocol-formatted). Three-stakeholder notification trilemma resolved through role-based information design.`,
+    conns:['core','p2','p4','m5','m7'] },
+
+  m7:{ badge:'Module 07', color:'#5AAAB8', sub:'Org Design as Product Design · Superminds',
+    insight:`Every product feature is a silent organisational redesign. Adding a recommendation engine shifts cognitive work from user judgment to machine prediction. That shift should be named, deliberated, and owned.`,
+    theory:`Five supermind types optimise for different cognitive bottlenecks. The question is not which is better — it is which cognitive gap this problem creates. Match structure to intelligence gap.`,
+    case:`Organisational processes redesigned using supermind frameworks for collective decision-making. Prediction market logic applied to strategic risk — aggregated forecasts significantly outperformed individual expert judgment. A community supermind failure was traced to mismatching structure to problem type.`,
+    conns:['core','p2','p5','m6','m9'] },
+
+  m8:{ badge:'Module 08', color:'#B06878', sub:'Moral Machine · GANs & Ethics',
+    insight:`The designer's job is not to solve the trolley problem. It's to build systems that make the scenario less likely — and to be transparent about how the system behaves when it cannot be avoided.`,
+    theory:`GANs are the canonical dual-use technology. Same capability, opposite moral outcomes. Governance gap is a design failure, not a policy problem. Ethics framework must be applied before deployment.`,
+    case:`AV ethical policy designed through the Moral Machine interface. TecoGAN evaluated for archival restoration use. Huru.ai assessed for interview coaching effectiveness and demographic bias in feedback calibration. Key finding: disclosure architecture matters more than detection accuracy.`,
+    conns:['core','p2','p4','m5','m9'] },
+
+  m9:{ badge:'Module 09', color:'#B06878', sub:'Disruption Analysis · Business Case',
+    insight:`Most AI features are sustaining innovations — making existing things marginally better for existing users. True disruptive AI changes who the customer is. That is a different brief, team, and success metric.`,
+    theory:`Business case rigor: quantify the baseline, size the gap, model full costs including maintenance (which frequently exceeds development), set realistic timelines. AI ROI rarely materialises in under 12 months.`,
+    case:`Applied disruption taxonomy to the generative AI landscape — mapping existential vs. incremental pressure on incumbents. Built business case with 18-month cost model. Analysed manufacturing AI failures to identify what successful implementations require.`,
+    conns:['core','p1','p4','p5','m7','m8'] }
+};
+
+// ───────── THREE.JS SCENE ─────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0A1022, 1);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0A1022, 0.030);
+
+const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 200);
+camera.position.set(0, 2, 13);
+camera.lookAt(0,0,0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+const coreLight = new THREE.PointLight(0xFFD57A, 1.0, 14);
+coreLight.position.set(0,0,0);
+scene.add(coreLight);
+// Subtle blue ambient fill from camera direction
+const fillLight = new THREE.DirectionalLight(0x85A9FF, 0.15);
+fillLight.position.set(5, 3, 8);
+scene.add(fillLight);
+
+function resize() {
+  const W = window.innerWidth, H = window.innerHeight - 52;
+  renderer.setSize(W, H);
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Stars
+(()=>{
+  const geo = new THREE.BufferGeometry();
+  const verts = [];
+  for(let i=0;i<1800;i++){
+    const th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1), r=35+Math.random()*55;
+    verts.push(r*Math.sin(ph)*Math.cos(th), r*Math.sin(ph)*Math.sin(th), r*Math.cos(ph));
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(verts,3));
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({color:0xffffff,size:0.07,transparent:true,opacity:0.35})));
+})();
+
+// Build nodes
+const nodeMeshes={}, nodeObjs={}, labelEls={}, hoverRings={};
+NODES.forEach(nd=>{
+  const grp = new THREE.Group();
+  grp.position.set(...nd.pos);
+
+  // Core sphere
+  const mat = new THREE.MeshBasicMaterial({color: nd.col});
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(nd.sz,32,32), mat);
+  grp.add(mesh);
+
+  // Inner glow — brighter for the blue-lit scene
+  const gmat = new THREE.MeshBasicMaterial({color:nd.col,transparent:true,opacity:0.10,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(nd.sz*1.9,24,24), gmat));
+
+  // Outer ambient
+  const amat = new THREE.MeshBasicMaterial({color:nd.col,transparent:true,opacity:0.030,side:THREE.BackSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(nd.sz*3.8,16,16), amat));
+
+  // Hover ring (billboard) — thinner, more elegant
+  const ringMat = new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  const ring = new THREE.Mesh(new THREE.RingGeometry(nd.sz*1.5,nd.sz*1.65,52), ringMat);
+  grp.add(ring);
+  hoverRings[nd.id] = {mesh:ring, mat:ringMat, targetOpacity:0};
+
+  scene.add(grp);
+  nodeMeshes[nd.id] = mesh;
+  nodeObjs[nd.id] = {grp, mesh, mat, gmat, data:nd};
+
+  // HTML label
+  const div = document.createElement('div');
+  div.className = `lbl ${nd.type}`;
+  div.innerHTML = `<div class="lbl-pill"><div class="lbl-text">${nd.lbl.replace('\n','<br>')}</div></div><div class="lbl-dot"></div>`;
+  document.getElementById('labels').appendChild(div);
+  labelEls[nd.id] = div;
+});
+
+// Lines
+const lines=[];
+function mkLine(a,b,op,bright){
+  const na=NODES.find(n=>n.id===a), nb=NODES.find(n=>n.id===b);
+  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...na.pos),new THREE.Vector3(...nb.pos)]);
+  const mat=new THREE.LineBasicMaterial({color:bright?0xAFBFEB:0x6B7AAB,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false});
+  const line=new THREE.Line(geo,mat);
+  scene.add(line);
+  lines.push({line,ids:[a,b],mat,base:op});
+}
+NODES.find(n=>n.id==='core').conns.forEach(p=>mkLine('core',p,0.20,true));
+[['p1','m1',0.10],['p1','m4',0.10],['p1','m7',0.10],['p1','m9',0.10],
+ ['p2','m4',0.10],['p2','m6',0.10],['p2','m7',0.10],['p2','m8',0.10],
+ ['p3','m1',0.10],['p3','m23',0.10],['p3','m4',0.10],['p3','m9',0.10],
+ ['p4','m4',0.10],['p4','m6',0.10],['p4','m8',0.10],['p4','m9',0.10],
+ ['p5','m7',0.10],['p5','m9',0.10]
+].forEach(([a,b,o])=>mkLine(a,b,o,false));
+[['m1','m23'],['m23','m4'],['m4','m5'],['m6','m7'],['m7','m9'],['m8','m9'],['m5','m8']
+].forEach(([a,b])=>mkLine(a,b,0.06,false));
+
+// Core pulse rings
+const pulseRings=[];
+for(let i=0;i<3;i++){
+  const mat=new THREE.MeshBasicMaterial({color:0xC4A870,transparent:true,opacity:0,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  const m=new THREE.Mesh(new THREE.RingGeometry(1.1,1.2,48),mat);
+  m.rotation.x=Math.PI/2;
+  scene.add(m);
+  pulseRings.push({mesh:m,mat,phase:i*(Math.PI*2/3)});
+}
+
+// ───────── ORBIT CONTROLS ─────────
+let theta=0.3, phi=1.28, radius=13, tTheta=0.3, tPhi=1.28, tRadius=13;
+let dragging=false, px=0, py=0, autoRotate=true, lastInt=0;
+
+function camUpdate(){
+  camera.position.set(radius*Math.sin(phi)*Math.cos(theta), radius*Math.cos(phi), radius*Math.sin(phi)*Math.sin(theta));
+  camera.lookAt(0,0,0);
+}
+canvas.addEventListener('mousedown',e=>{dragging=true;px=e.clientX;py=e.clientY;autoRotate=false;lastInt=Date.now()});
+window.addEventListener('mouseup',()=>dragging=false);
+window.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  tTheta-=(e.clientX-px)*0.006; tPhi=Math.max(0.25,Math.min(Math.PI-0.25,tPhi+(e.clientY-py)*0.006));
+  px=e.clientX;py=e.clientY;lastInt=Date.now();
+});
+canvas.addEventListener('wheel',e=>{tRadius=Math.max(5.5,Math.min(22,tRadius+e.deltaY*0.012));autoRotate=false;lastInt=Date.now()},{passive:true});
+
+// ───────── RAYCASTER + HOVER ─────────
+const ray=new THREE.Raycaster();
+const m2d=new THREE.Vector2();
+let selId=null, hovId=null;
+const tip=document.getElementById('tip');
+let tipX=0,tipY=0;
+
+function allMeshes(){return Object.entries(nodeMeshes).map(([id,mesh])=>({id,mesh}))}
+
+canvas.addEventListener('click',e=>{
+  if(dragging)return;
+  m2d.x=(e.clientX/window.innerWidth)*2-1;
+  m2d.y=-((e.clientY-52)/(window.innerHeight-52))*2+1;
+  ray.setFromCamera(m2d,camera);
+  const hits=ray.intersectObjects(allMeshes().map(x=>x.mesh));
+  if(hits.length){
+    const id=allMeshes().find(x=>x.mesh===hits[0].object)?.id;
+    if(id){
+      // click pop animation
+      const obj=nodeObjs[id];
+      if(obj){obj.clickPop=1.0;}
+      openPanel(id);
+    }
+  } else closePanel();
+});
+
+window.addEventListener('mousemove',e=>{
+  tipX=e.clientX+14; tipY=e.clientY+14;
+  if(dragging)return;
+  m2d.x=(e.clientX/window.innerWidth)*2-1;
+  m2d.y=-((e.clientY-52)/(window.innerHeight-52))*2+1;
+  ray.setFromCamera(m2d,camera);
+  const hits=ray.intersectObjects(allMeshes().map(x=>x.mesh));
+  const prev=hovId;
+  hovId=hits.length?allMeshes().find(x=>x.mesh===hits[0].object)?.id||null:null;
+  document.body.style.cursor=hovId?'pointer':'default';
+  tip.style.left=tipX+'px';tip.style.top=tipY+'px';
+  tip.classList.toggle('show',!!hovId);
+});
+
+// ───────── PANEL ─────────
+function nodeLbl(id){const n=NODES.find(x=>x.id===id);return n?n.lbl.replace('\n',' '):id}
+
+function openPanel(id){
+  selId=id;
+  const d=CONTENT[id]; if(!d)return;
+  const eyEl=document.getElementById('p-ey');
+  eyEl.innerHTML=`<span class="badge-dot" style="background:${d.color}"></span>${d.badge}`;
+  eyEl.style.color=d.color;
+  document.getElementById('p-title').textContent=nodeLbl(id);
+  document.getElementById('p-sub').textContent=d.sub;
+  document.getElementById('p-body').innerHTML=`
+    <div class="p-insight">
+      <div class="p-label"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>Designer's Insight</div>
+      <div class="p-insight-text">${d.insight}</div>
+    </div>
+    ${d.theory?`<div class="p-section">
+      <div class="p-label"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>Theory</div>
+      <div class="p-text">${d.theory}</div>
+    </div>`:''}
+    ${d.case?`<div class="p-section">
+      <div class="p-label" style="color:#C4A870"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>Case in Point</div>
+      <div class="p-case">${d.case}</div>
+    </div>`:''}
+    ${d.conns?.length?`<div class="p-section">
+      <div class="p-label"><svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Connected to</div>
+      <div class="conn-wrap">${d.conns.map(c=>`<span class="conn-tag" onclick="openPanel('${c}')">${nodeLbl(c)}</span>`).join('')}</div>
+    </div>`:''}
+  `;
+  document.getElementById('p-body').scrollTop=0;
+  document.getElementById('panel').classList.add('open');
+  autoRotate=false;
+}
+function closePanel(){document.getElementById('panel').classList.remove('open');selId=null;setTimeout(()=>{autoRotate=true;},2000);}
+window.closePanel=closePanel; window.openPanel=openPanel;
+
+// ───────── LABELS ─────────
+const tmp=new THREE.Vector3();
+function updateLabels(){
+  NODES.forEach(nd=>{
+    const el=labelEls[nd.id];
+    tmp.set(...nd.pos);tmp.project(camera);
+    const W=window.innerWidth,H=window.innerHeight-52;
+    el.style.left=(tmp.x*.5+.5)*W+'px';
+    el.style.top=(-(tmp.y*.5)+.5)*H+52+'px';
+    const behind=tmp.z>1;
+    el.style.opacity=behind?0:1;
+    const inFocus=!selId||nd.id===selId||CONTENT[selId]?.conns?.includes(nd.id);
+    el.classList.toggle('dim',!!(selId&&!inFocus));
+    el.classList.toggle('highlighted',!!(selId&&inFocus&&nd.id!==selId));
+  });
+}
+
+// ───────── ANIMATION ─────────
+let t=0, isPaused=false;
+function animate(){
+  requestAnimationFrame(animate);
+  if(isPaused)return;
+  t+=0.016;
+  if(!dragging&&!selId&&Date.now()-lastInt>3500)autoRotate=true;
+  if(autoRotate)tTheta+=0.0008; // slower, more meditative
+  theta+=(tTheta-theta)*.055; phi+=(tPhi-phi)*.055; radius+=(tRadius-radius)*.055;
+  camUpdate();
+
+  NODES.forEach(nd=>{
+    const obj=nodeObjs[nd.id];
+    const isHov=nd.id===hovId, isSel=nd.id===selId;
+    const inFocus=!selId||nd.id===selId||CONTENT[selId]?.conns?.includes(nd.id);
+
+    // Click pop: quick burst to 1.4 then settle to selected size
+    if(obj.clickPop>0){
+      obj.clickPop=Math.max(0,obj.clickPop-0.06);
+      const popScale=1.22+obj.clickPop*0.22;
+      obj.mesh.scale.set(popScale,popScale,popScale);
+    } else {
+      const ts=isSel?1.22:isHov?1.10:1.0;
+      obj.mesh.scale.lerp(new THREE.Vector3(ts,ts,ts),.09);
+    }
+
+    const tc=inFocus?new THREE.Color(nd.col):new THREE.Color(nd.col).multiplyScalar(0.18);
+    obj.mat.color.lerp(tc,.08);
+    // More responsive glow intensity
+    const targetGlow=inFocus?(isSel?0.22:isHov?0.17:0.09):0.008;
+    obj.gmat.opacity+=(targetGlow-obj.gmat.opacity)*.10;
+    // Subtle module float — each node gets a unique phase
+    if(nd.id!=='core'){
+      const phase=nd.pos[0]*0.3+nd.pos[2]*0.2;
+      obj.grp.position.y=nd.pos[1]+Math.sin(t*0.4+phase)*0.06;
+    } else {
+      obj.grp.position.y=Math.sin(t*.45)*.06;
+    }
+
+    // Hover ring billboard — fade in/out
+    const hr=hoverRings[nd.id];
+    hr.targetOpacity=(isHov||isSel)?0.40:0;
+    hr.mat.opacity+=(hr.targetOpacity-hr.mat.opacity)*.12;
+    hr.mesh.quaternion.copy(camera.quaternion);
+  });
+
+  // Pulse rings (core) — slower, more ambient
+  pulseRings.forEach(pr=>{
+    const p=((t*.35+pr.phase)%(Math.PI*2))/(Math.PI*2);
+    pr.mesh.scale.set(1+p*4,1+p*4,1+p*4);
+    pr.mat.opacity=(1-p)*0.08;
+  });
+
+  // Lines
+  lines.forEach(lo=>{
+    const[a,b]=lo.ids;
+    const rel=!selId||a===selId||b===selId||CONTENT[selId]?.conns?.includes(a)||CONTENT[selId]?.conns?.includes(b);
+    const tg=rel?lo.base:lo.base*.10;
+    lo.mat.opacity+=(tg-lo.mat.opacity)*.07;
+  });
+
+  updateLabels();
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
